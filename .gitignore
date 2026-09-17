@@ -1,0 +1,7 @@
+ragenv/
+.env
+__pycache__/
+*.pyc
+data/vector_store/
+logs/
+*.pkl
