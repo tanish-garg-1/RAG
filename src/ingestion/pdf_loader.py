@@ -1,9 +1,10 @@
-import fitz
+import pymupdf
+
 
 class PDFLoader:
     def load(self, pdf_path: str) -> list[tuple[int, str]]:
         pages = []
-        doc = fitz.open(pdf_path)
+        doc = pymupdf.open(pdf_path)
 
         for page_number, page in enumerate(doc, start=1):
             text = page.get_text()

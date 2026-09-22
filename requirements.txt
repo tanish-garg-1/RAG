@@ -1,5 +1,9 @@
-typer 
+typer
 rich
 python-dotenv
 groq
 pymupdf
+chromadb
+fastembed
+rank-bm25
+pytest
