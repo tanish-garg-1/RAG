@@ -31,6 +31,20 @@ GROUNDING_CHECK_PROMPT = (
 )
 
 
+REWRITE_QUERY_PROMPT = (
+    "You rewrite questions into search queries for finding passages in a document.\n"
+    "The first search found nothing relevant, so try different wording: use synonyms, the likely "
+    "terms the document itself would use, and the key concepts. Drop filler words and names of "
+    "people who may simply be the author.\n"
+    "Reply with only the search query on one line, no explanation."
+)
+
+
+def rewrite_user_prompt(question: str, previous_queries: list[str]) -> str:
+    tried = "".join(f"\nAlready tried: {q}" for q in previous_queries)
+    return f"Question: {question}{tried}"
+
+
 def build_context(chunks: list[RetrievedChunk]) -> str:
     return "\n\n".join(
         f"[Excerpt {i} | {rc.chunk.source} | page {rc.chunk.page}]\n{rc.chunk.text}"

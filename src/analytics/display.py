@@ -40,6 +40,10 @@ def show_analytics(result: RAGResult):
         f"[dim]method:[/] {verdict.method}  [dim]top relevance:[/] {verdict.top_score:.3f}"
     )
     console.print(f"[dim]{verdict.reason}[/]")
+    if result.path:
+        console.print(f"[dim]Path:[/] {' → '.join(result.path)}")
+    for i, query in enumerate(result.rewritten_queries, start=1):
+        console.print(f"[dim]Retry {i} searched for:[/] [italic]{query}[/]")
 
     if result.chunks:
         table = Table(title="Retrieved chunks", title_justify="left", show_lines=False)
@@ -64,7 +68,7 @@ def show_analytics(result: RAGResult):
     console.print(
         "[dim]Latency:[/] "
         + "  ".join(f"{name.removesuffix('_ms')} {t[name]:.0f}ms" for name in
-                    ("dense_ms", "bm25_ms", "rerank_ms", "scope_ms", "llm_ms", "total_ms") if name in t)
+                    ("dense_ms", "bm25_ms", "rerank_ms", "scope_ms", "rewrite_ms", "llm_ms", "total_ms") if name in t)
     )
 
 

@@ -18,6 +18,8 @@ class QueryLogger:
             "method": result.verdict.method,
             "top_rerank_score": round(result.verdict.top_score, 4),
             "pages": result.pages,
+            "path": result.path,
+            "rewritten_queries": result.rewritten_queries,
             "chunks": [
                 {
                     "page": rc.chunk.page,

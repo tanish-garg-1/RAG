@@ -35,6 +35,8 @@ class RAGResult:
     verdict: ScopeVerdict
     chunks: list[RetrievedChunk]
     timings_ms: dict[str, float] = field(default_factory=dict)
+    rewritten_queries: list[str] = field(default_factory=list)
+    path: list[str] = field(default_factory=list)   # graph nodes in the order they ran
 
     @property
     def pages(self) -> list[int]:

@@ -16,9 +16,17 @@ def build_pipeline():
         return RAGPipeline()
 
 
+# Shown once a node FINISHES, so each label describes what happens next.
+NEXT_STEP_LABELS = {
+    "retrieve": "Checking whether the PDF covers it...",
+    "check_scope": "Working on the answer...",
+    "rewrite_query": "Weak match, searching again with a rewritten query...",
+}
+
+
 def run_question(pipeline, logger, question: str, show_scores: bool):
-    with console.status("Thinking..."):
-        result = pipeline.answer(question)
+    with console.status("Searching the PDF...") as status:
+        result = pipeline.answer(question, on_step=lambda node: status.update(NEXT_STEP_LABELS.get(node, "Working...")))
     logger.log(result, pipeline.groq_client.last_usage)
     show_result(result, show_scores=show_scores)
     return result
@@ -124,6 +132,13 @@ def stats():
         f"avg {avg_ms:.0f}ms"
     )
     console.print("  decided by: " + ", ".join(f"{m} {n}" for m, n in methods.most_common()))
+
+
+@app.command()
+def graph():
+    """Print the LangGraph workflow as a Mermaid diagram."""
+    from src.pipeline.rag_pipeline import RAGPipeline
+    print(RAGPipeline().graph_mermaid())
 
 
 @app.command()

@@ -7,3 +7,4 @@ chromadb
 fastembed
 rank-bm25
 pytest
+langgraph

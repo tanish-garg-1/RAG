@@ -1,8 +1,10 @@
 import time
 from pathlib import Path
+from typing import Callable
 
 from src.generation.groq_client import GroqClient
-from src.generation.prompts import OUT_OF_PDF_PROMPT, IN_PDF_PROMPT, in_pdf_user_prompt
+from src.graph.build import build_rag_graph
+from src.graph.nodes import RAGNodes
 from src.indexing.bm25_store import BM25Store
 from src.indexing.embedder import Embedder
 from src.indexing.vector_store import VectorStore
@@ -23,6 +25,7 @@ class RAGPipeline:
         self.retriever = Retriever(self.embedder, self.vector_store, self.bm25_store)
         self._groq_client = None
         self._scope_checker = None
+        self._graph = None
 
     # The Groq client is created lazily so `ingest` works without an API key.
     @property
@@ -64,26 +67,41 @@ class RAGPipeline:
         self.bm25_store.build(self.vector_store.all_chunks())
         self.bm25_store.save()
 
-    def answer(self, question: str) -> RAGResult:
-        timings: dict[str, float] = {}
-        scope_checker = self.scope_checker  # create the Groq client up front so setup isn't timed as "scope"
+    @property
+    def graph(self):
+        if self._graph is None:
+            nodes = RAGNodes(self.retriever, self.scope_checker, self.groq_client)
+            self._graph = build_rag_graph(nodes)
+        return self._graph
+
+    def answer(self, question: str, on_step: Callable[[str], None] | None = None) -> RAGResult:
+        """Run the LangGraph workflow. `on_step` is called with each node name as it finishes."""
+        graph = self.graph  # build before timing so Groq client setup isn't counted
         total_start = time.perf_counter()
 
-        chunks = self.retriever.retrieve(question, timings)
+        state: dict = {"question": question, "search_query": question, "rewritten_queries": [], "timings_ms": {}}
+        path: list[str] = []
+        for update in graph.stream(state, stream_mode="updates"):
+            for node, changes in update.items():
+                path.append(node)
+                state.update(changes)
+                if on_step:
+                    on_step(node)
 
-        start = time.perf_counter()
-        verdict = scope_checker.check(question, chunks)
-        timings["scope_ms"] = (time.perf_counter() - start) * 1000
-
-        start = time.perf_counter()
-        if verdict.in_pdf:
-            answer = self.groq_client.complete(IN_PDF_PROMPT, in_pdf_user_prompt(question, chunks))
-        else:
-            answer = self.groq_client.complete(OUT_OF_PDF_PROMPT, question)
-        timings["llm_ms"] = (time.perf_counter() - start) * 1000
+        timings = state["timings_ms"]
         timings["total_ms"] = (time.perf_counter() - total_start) * 1000
+        return RAGResult(
+            question=question,
+            answer=state["answer"],
+            verdict=state["verdict"],
+            chunks=state["chunks"],
+            timings_ms=timings,
+            rewritten_queries=state["rewritten_queries"],
+            path=path,
+        )
 
-        return RAGResult(question=question, answer=answer, verdict=verdict, chunks=chunks, timings_ms=timings)
+    def graph_mermaid(self) -> str:
+        return self.graph.get_graph().draw_mermaid()
 
     def reset(self):
         self.vector_store.reset()

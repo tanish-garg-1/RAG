@@ -39,6 +39,12 @@ class Settings:
         self.high_confidence = 0.6
         self.low_confidence = 0.05
 
+        # --- Corrective retry (LangGraph loop) ---
+        # When a question looks out of the PDF but some chunk scored at least this much,
+        # rewrite the question and search again. Near-zero scores skip the retry.
+        self.max_rewrites = 1
+        self.retry_min_score = 0.005
+
         # --- Paths ---
         self.pdf_dir = BASE_DIR / "data" / "pdfs"
         self.vector_store_dir = BASE_DIR / "data" / "vector_store"
