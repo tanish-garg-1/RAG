@@ -20,7 +20,7 @@ class Chunker:
 
         for page_number, text in pages:
             words = re.sub(r"\s+", " ", text).strip().split(" ")
-            if words == [""]:
+            if words == [""] or len(words) < settings.min_page_words:
                 continue
 
             start, index = 0, 0

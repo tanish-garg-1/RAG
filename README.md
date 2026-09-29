@@ -67,6 +67,30 @@ python main.py reset                      # clear the index
 
 Re-ingesting a file replaces its chunks instead of duplicating them.
 
+## Images and scanned pages
+
+At ingest time a vision model can read the parts of a PDF that text extraction misses:
+figures and charts are described, and pages with no extractable text are rendered and transcribed.
+The results are indexed as ordinary chunks (marked `from image`), so questions about a chart are answered
+from the PDF and cited as `(figure, p. N)`.
+
+Providers are tried in order:
+1. **Gemini**, when `GEMINI_API_KEY` is set.
+2. **Ollama**, when its server is running. It takes over when Gemini's quota is exhausted, and Gemini is tried again after 60 s.
+
+```bash
+python main.py vision-status              # is Gemini / Ollama ready?
+python main.py ingest                     # images are described by default
+python main.py ingest --no-images         # text only
+```
+
+Every description is cached by image hash in `data/vision_cache.json`, so re-running ingest costs nothing for
+images already described. If some images fail (for example both providers are out of quota), ingest reports it;
+run it again later and only the missing ones are processed. Icons under 150 px are skipped, and images the model
+judges decorative (logos, dividers) are dropped. Set `OLLAMA_MODEL` in `.env` to any vision-capable model you have pulled.
+
+Numbers read from charts are model-generated and can be slightly off, which is why answers flag figure sources.
+
 ## Analytics panel
 
 Each answer shows the verdict, how it was decided (`high_score`, `low_score`, `llm_check`),
@@ -109,6 +133,7 @@ src/indexing/               embeddings, ChromaDB, BM25
 src/retrieval/              RRF fusion, reranker, retriever
 src/generation/             Groq client and prompts
 src/graph/                  LangGraph state, nodes and graph wiring
+src/vision/                 Gemini / Ollama providers, fallback and cache for image descriptions
 src/pipeline/               scope checker, ingestion and graph runner
 src/analytics/              terminal display and query log
 tests/                      chunker, RRF, scope-checker and graph-routing tests

@@ -7,3 +7,4 @@ data/models/
 logs/
 *.pkl
 .pytest_cache/
+data/vision_cache.json

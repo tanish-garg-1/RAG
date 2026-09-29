@@ -26,6 +26,7 @@ class Settings:
         # --- Chunking (measured in words) ---
         self.chunk_size = 200
         self.chunk_overlap = 40
+        self.min_page_words = 2      # skip pages like chapter dividers that extract to a single digit
 
         # --- Retrieval ---
         self.dense_k = 20            # candidates from vector search
@@ -45,6 +46,16 @@ class Settings:
         self.max_rewrites = 1
         self.retry_min_score = 0.005
 
+        # --- Vision (image / scanned-page understanding at ingest time) ---
+        # Gemini is tried first; when its quota runs out, a local Ollama model takes over.
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY", "")
+        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        self.ollama_model = os.getenv("OLLAMA_MODEL", "qwen3.8-flash-next:125b-mlx")
+        self.ollama_timeout = 300          # local models are slow; seconds
+        self.min_image_px = 150            # skip icons/bullets smaller than this in either dimension
+        self.page_render_dpi = 150         # resolution when a whole scanned page is sent as an image
+
         # --- Paths ---
         self.pdf_dir = BASE_DIR / "data" / "pdfs"
         self.vector_store_dir = BASE_DIR / "data" / "vector_store"
@@ -52,6 +63,7 @@ class Settings:
         self.bm25_path = self.vector_store_dir / "bm25_index.pkl"
         self.query_log_path = BASE_DIR / "logs" / "queries.jsonl"
         self.collection_name = "pdf_chunks"
+        self.vision_cache_path = BASE_DIR / "data" / "vision_cache.json"
 
 
 settings = Settings()

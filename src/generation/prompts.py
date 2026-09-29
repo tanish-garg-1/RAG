@@ -12,6 +12,8 @@ IN_PDF_PROMPT = (
     "- The excerpts are the document's own text. If the question mentions the author, the book or "
     "'the document', the excerpts ARE that source: first-person statements are the author's views.\n"
     "- Cite the page for each claim like (p. 12).\n"
+    "- Excerpts starting with [Figure on page N] or [Scanned page N] were written by a vision model from an "
+    "image, not copied from the PDF text. Cite them like (figure, p. N) and treat numbers read from charts as approximate.\n"
     "- If the excerpts only partly answer the question, answer that part and say what is missing.\n"
     "- Be concise and direct."
 )
@@ -47,7 +49,7 @@ def rewrite_user_prompt(question: str, previous_queries: list[str]) -> str:
 
 def build_context(chunks: list[RetrievedChunk]) -> str:
     return "\n\n".join(
-        f"[Excerpt {i} | {rc.chunk.source} | page {rc.chunk.page}]\n{rc.chunk.text}"
+        f"[Excerpt {i} | {rc.chunk.source} | page {rc.chunk.page}{' | from image' if rc.chunk.kind == 'image' else ''}]\n{rc.chunk.text}"
         for i, rc in enumerate(chunks, start=1)
     )
 

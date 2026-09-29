@@ -36,6 +36,14 @@ def test_chunks_never_cross_pages_and_skip_empty_pages():
     assert "a0" not in chunks[1].text
 
 
+def test_chapter_divider_pages_are_skipped():
+    # A page whose only extractable text is a lone chapter number (e.g. "3") carries no
+    # searchable content and would otherwise become a spurious, high-scoring chunk.
+    pages = [(1, "3"), (2, words(5))]
+    chunks = Chunker(chunk_size=10, overlap=2).split(pages, "doc.pdf")
+    assert [c.page for c in chunks] == [2]
+
+
 def test_whitespace_is_normalised():
     chunks = Chunker(chunk_size=10, overlap=2).split([(1, "hello\n\n  world\tagain")], "doc.pdf")
     assert chunks[0].text == "hello world again"

@@ -8,3 +8,5 @@ fastembed
 rank-bm25
 pytest
 langgraph
+httpx
+google-genai

@@ -25,7 +25,7 @@ class VectorStore:
                 ids=[c.chunk_id for c in batch],
                 embeddings=embeddings[i:i + batch_size],
                 documents=[c.text for c in batch],
-                metadatas=[{"source": c.source, "page": c.page} for c in batch],
+                metadatas=[{"source": c.source, "page": c.page, "kind": c.kind} for c in batch],
             )
 
     def delete_source(self, source: str):
@@ -43,14 +43,14 @@ class VectorStore:
         for chunk_id, text, meta, distance in zip(
             result["ids"][0], result["documents"][0], result["metadatas"][0], result["distances"][0]
         ):
-            chunk = Chunk(chunk_id=chunk_id, text=text, source=meta["source"], page=meta["page"])
+            chunk = Chunk(chunk_id, text, meta["source"], meta["page"], meta.get("kind", "text"))
             hits.append((chunk, 1.0 - distance))  # cosine distance -> similarity
         return hits
 
     def all_chunks(self) -> list[Chunk]:
         result = self.collection.get(include=["documents", "metadatas"])
         return [
-            Chunk(chunk_id=chunk_id, text=text, source=meta["source"], page=meta["page"])
+            Chunk(chunk_id, text, meta["source"], meta["page"], meta.get("kind", "text"))
             for chunk_id, text, meta in zip(result["ids"], result["documents"], result["metadatas"])
         ]
 

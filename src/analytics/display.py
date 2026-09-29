@@ -27,7 +27,10 @@ def show_result(result: RAGResult, show_scores: bool = True):
 
     if verdict.in_pdf and result.pages:
         sources = sorted({rc.chunk.source for rc in result.chunks})
+        figure_pages = sorted({rc.chunk.page for rc in result.chunks if rc.chunk.kind == "image"})
         console.print(f"[dim]Sources:[/] {', '.join(sources)} — pages {', '.join(map(str, result.pages))}")
+        if figure_pages:
+            console.print(f"[dim]Figures / scans used:[/] pages {', '.join(map(str, figure_pages))} [dim](read by a vision model, may be approximate)[/]")
 
     if show_scores:
         show_analytics(result)
@@ -76,4 +79,5 @@ def show_sources(result: RAGResult):
     if not result.verdict.in_pdf:
         console.print("[yellow]These were the closest chunks, but they were judged irrelevant and NOT used for the answer.[/]")
     for i, rc in enumerate(result.chunks, start=1):
-        console.print(Panel(rc.chunk.text, title=f"[{i}] {rc.chunk.source} — page {rc.chunk.page}", border_style="dim"))
+        kind = " (from image)" if rc.chunk.kind == "image" else ""
+        console.print(Panel(rc.chunk.text, title=f"[{i}] {rc.chunk.source} — page {rc.chunk.page}{kind}", border_style="dim"))

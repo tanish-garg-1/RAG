@@ -32,8 +32,53 @@ def run_question(pipeline, logger, question: str, show_scores: bool):
     return result
 
 
+def show_vision_summary(vision: dict, images_requested: bool):
+    if not images_requested:
+        return
+    if not vision.get("enabled"):
+        console.print(f"  [yellow]Images skipped:[/] {vision.get('reason', 'vision disabled')}")
+        return
+    used = ", ".join(f"{name} {n}" for name, n in vision["providers"].items()) or "none"
+    console.print(
+        f"  Images: {vision['images']} found — {vision['described']} described, "
+        f"{vision['decorative']} decorative, {vision['failed']} failed  [dim](used: {used}; cached: {vision['cache_hits']})[/]"
+    )
+    for event in dict.fromkeys(vision["events"]):   # de-duplicated, order kept
+        console.print(f"  [yellow]•[/] {event}")
+    if vision["failed"]:
+        console.print(
+            f"  [yellow]{vision['failed']} image(s) could not be read[/] (last error: {vision['last_error']}). "
+            "Run ingest again later: images already described are cached and cost nothing."
+        )
+
+
+@app.command("vision-status")
+def vision_status_command():
+    """Show whether Gemini and Ollama are ready for image understanding."""
+    from src.vision.describer import vision_status
+    status = vision_status()
+
+    gemini = status["gemini"]
+    key = "[green]key set[/]" if gemini["configured"] else "[yellow]no GEMINI_API_KEY[/]"
+    console.print(f"[bold]1. Gemini[/] ({gemini['model']}): {key}")
+
+    ollama = status["ollama"]
+    if not ollama["reachable"]:
+        console.print(f"[bold]2. Ollama[/] ({ollama['model']}): [yellow]server not reachable at {ollama['host']}[/]")
+        return
+    if ollama["model_installed"]:
+        console.print(f"[bold]2. Ollama[/] ({ollama['model']}): [green]ready[/]")
+    else:
+        installed = ", ".join(ollama["installed"]) or "none"
+        console.print(f"[bold]2. Ollama[/]: [yellow]server is up but '{ollama['model']}' is not pulled[/] (installed: {installed})")
+        console.print(f"   Run: ollama pull {ollama['model']}   or set OLLAMA_MODEL to one of the installed names.")
+
+
 @app.command()
-def ingest(path: Optional[Path] = typer.Argument(None, help="A PDF file or a folder of PDFs. Defaults to data/pdfs.")):
+def ingest(
+    path: Optional[Path] = typer.Argument(None, help="A PDF file or a folder of PDFs. Defaults to data/pdfs."),
+    images: bool = typer.Option(True, "--images/--no-images", help="Describe figures and scanned pages with a vision model."),
+):
     """Extract, chunk, embed and index PDFs."""
     path = path or settings.pdf_dir
     pdfs = sorted(path.glob("*.pdf")) if path.is_dir() else [path]
@@ -43,12 +88,14 @@ def ingest(path: Optional[Path] = typer.Argument(None, help="A PDF file or a fol
 
     pipeline = build_pipeline()
     for pdf in pdfs:
-        with console.status(f"Ingesting {pdf.name} (first run downloads the embedding model)..."):
-            stats = pipeline.ingest(str(pdf))
+        with console.status(f"Ingesting {pdf.name} (first run downloads the embedding model)...") as status:
+            stats = pipeline.ingest(str(pdf), describe_images=images, on_progress=status.update)
         console.print(
             f"[green]✔[/] {stats['source']}: {stats['pages']} pages "
-            f"({stats['empty_pages']} without text), {stats['chunks']} chunks in {stats['seconds']:.1f}s"
+            f"({stats['empty_pages']} without text), {stats['chunks']} chunks "
+            f"({stats['image_chunks']} from images) in {stats['seconds']:.1f}s"
         )
+        show_vision_summary(stats["vision"], images)
     console.print(f"Index now holds {pipeline.vector_store.count()} chunks.")
 
 
@@ -56,6 +103,9 @@ def ingest(path: Optional[Path] = typer.Argument(None, help="A PDF file or a fol
 def ask(question: str, scores: bool = typer.Option(True, help="Show the analytics panel.")):
     """Answer a single question."""
     from src.analytics.query_logger import QueryLogger
+    if not question.strip():
+        console.print("[yellow]Question is empty.[/]")
+        raise typer.Exit(1)
     pipeline = build_pipeline()
     if pipeline.vector_store.count() == 0:
         console.print("[yellow]The index is empty — run `python main.py ingest` first.[/]")

@@ -1,4 +1,5 @@
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Callable
 
@@ -13,6 +14,7 @@ from src.ingestion.pdf_loader import PDFLoader
 from src.models import RAGResult
 from src.pipeline.scope_checker import ScopeChecker
 from src.retrieval.retriever import Retriever
+from src.vision.describer import build_describer
 
 
 class RAGPipeline:
@@ -40,15 +42,29 @@ class RAGPipeline:
             self._scope_checker = ScopeChecker(self.groq_client)
         return self._scope_checker
 
-    def ingest(self, pdf_path: str) -> dict:
+    def ingest(self, pdf_path: str, describe_images: bool = True,
+               on_progress: Callable[[str], None] | None = None) -> dict:
         source = Path(pdf_path).name
         start = time.perf_counter()
 
-        pages = PDFLoader().load(pdf_path)
-        chunks = Chunker().split(pages, source)
-        if not chunks:
-            raise ValueError(f"No extractable text in {source}. Is it a scanned PDF?")
+        loader = PDFLoader()
+        pages = loader.load(pdf_path)
+        chunker = Chunker()
+        chunks = chunker.split(pages, source)
 
+        vision = {"enabled": False}
+        if describe_images:
+            image_chunks, vision = self._describe_images(loader, chunker, pdf_path, source, on_progress)
+            chunks += image_chunks
+
+        if not chunks:
+            raise ValueError(
+                f"No extractable text in {source}. It looks scanned; configure a vision provider "
+                "(GEMINI_API_KEY or a running Ollama) and ingest with images enabled."
+            )
+
+        if on_progress:
+            on_progress("Embedding chunks...")
         embeddings = self.embedder.embed_documents([c.text for c in chunks])
         self.vector_store.delete_source(source)  # re-ingesting replaces, never duplicates
         self.vector_store.add_chunks(chunks, embeddings)
@@ -59,9 +75,39 @@ class RAGPipeline:
             "pages": len(pages),
             "empty_pages": sum(1 for _, text in pages if not text.strip()),
             "chunks": len(chunks),
+            "image_chunks": sum(1 for c in chunks if c.kind == "image"),
+            "vision": vision,
             "total_chunks": self.vector_store.count(),
             "seconds": time.perf_counter() - start,
         }
+
+    def _describe_images(self, loader, chunker, pdf_path, source, on_progress):
+        """Returns (image chunks, stats). Vision problems are reported in the stats and never abort ingest."""
+        describer = build_describer()
+        if describer is None:
+            return [], {"enabled": False, "reason": "no vision provider available (set GEMINI_API_KEY or start Ollama)"}
+
+        chunks, stats = [], {"enabled": True, "images": 0, "described": 0, "decorative": 0, "failed": 0}
+        for image in loader.iter_images(pdf_path):
+            stats["images"] += 1
+            if on_progress:
+                on_progress(f"Describing images ({stats['images']} so far)...")
+            text = describer.describe(image)
+            if text is None:
+                stats["failed"] += 1
+            elif not text:
+                stats["decorative"] += 1
+            else:
+                stats["described"] += 1
+                label = "Scanned page" if image.is_full_page else "Figure"
+                for j, chunk in enumerate(chunker.split([(image.page, f"[{label} on page {image.page}] {text}")], source)):
+                    chunks.append(replace(chunk, chunk_id=f"{source}::p{image.page}::img{image.index}::c{j}", kind="image"))
+
+        stats.update(
+            providers=dict(describer.provider_counts), cache_hits=describer.cache_hits,
+            events=describer.events, last_error=describer.last_error,
+        )
+        return chunks, stats
 
     def rebuild_bm25(self):
         self.bm25_store.build(self.vector_store.all_chunks())

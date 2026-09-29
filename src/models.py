@@ -7,6 +7,17 @@ class Chunk:
     text: str
     source: str
     page: int
+    kind: str = "text"   # "text" for PDF text, "image" for a vision-model description of a figure/scanned page
+
+
+@dataclass
+class PageImage:
+    """An image pulled from a PDF, ready to be sent to a vision model."""
+    page: int
+    index: int           # position within the page, for stable chunk ids
+    data: bytes
+    mime_type: str
+    is_full_page: bool   # True when a scanned page was rendered whole (needs transcription, not description)
 
 
 @dataclass
