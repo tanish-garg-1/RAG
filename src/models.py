@@ -32,6 +32,14 @@ class RetrievedChunk:
 
 
 @dataclass
+class WebResult:
+    """One web search hit that an out-of-PDF answer was written from."""
+    title: str
+    url: str
+    content: str
+
+
+@dataclass
 class ScopeVerdict:
     in_pdf: bool
     top_score: float
@@ -51,6 +59,15 @@ class RAGResult:
     path: list[str] = field(default_factory=list)   # graph nodes in the order they ran
     provider: str | None = None                      # which LLM provider wrote the answer ("groq" / "azure")
     persona: str = "default"
+    web_sources: list[WebResult] = field(default_factory=list)   # filled when the answer came from web search
+    web_error: str | None = None                                  # why web search was tried but not used
+
+    @property
+    def answer_source(self) -> str:
+        """Where the answer's facts came from: the "pdf", the "web", or the "model"'s own knowledge."""
+        if self.verdict.in_pdf:
+            return "pdf"
+        return "web" if self.web_sources else "model"
 
     @property
     def pages(self) -> list[int]:

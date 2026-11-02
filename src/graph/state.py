@@ -1,6 +1,6 @@
 from typing import TypedDict
 
-from src.models import RetrievedChunk, ScopeVerdict
+from src.models import RetrievedChunk, ScopeVerdict, WebResult
 
 
 class RAGState(TypedDict, total=False):
@@ -10,6 +10,8 @@ class RAGState(TypedDict, total=False):
     rewritten_queries: list[str]   # every rewrite, in order
     chunks: list[RetrievedChunk]
     verdict: ScopeVerdict
+    web_sources: list[WebResult]   # web results the out-of-PDF answer is written from (empty = none used)
+    web_error: str                 # why web search was tried but not used
     answer: str
     timings_ms: dict[str, float]
 

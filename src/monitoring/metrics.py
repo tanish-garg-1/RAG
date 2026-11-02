@@ -12,6 +12,10 @@ LLM_PROVIDER = Counter(
     ["provider"], registry=REGISTRY,
 )
 FALLBACKS = Counter("rag_llm_fallbacks_total", "Answers served by the backup provider", registry=REGISTRY)
+WEB_SEARCHES = Counter(
+    "rag_web_searches_total", "Out-of-PDF questions sent to web search, by outcome",
+    ["outcome"], registry=REGISTRY,
+)
 ERRORS = Counter("rag_errors_total", "Requests that failed", ["endpoint"], registry=REGISTRY)
 INGESTS = Counter("rag_ingests_total", "PDFs ingested", registry=REGISTRY)
 LATENCY = Histogram(

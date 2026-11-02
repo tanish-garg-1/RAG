@@ -48,7 +48,8 @@ with st.sidebar:
         )
         st.caption(
             f"Groq: {'✅' if health['groq_configured'] else '❌'} · "
-            f"Azure backup: {'✅' if health['azure_configured'] else '— not configured'}"
+            f"Azure backup: {'✅' if health['azure_configured'] else '— not configured'} · "
+            f"Web search: {'✅' if health['web_search_configured'] else '— not configured'}"
         )
 
     st.divider()
@@ -97,10 +98,14 @@ def render_explanation(explanation: dict):
 
 
 def render_answer(data: dict):
-    if data["in_pdf"]:
+    if data["answer_source"] == "pdf":
         st.success("✔ Answered from the PDF")
+    elif data["answer_source"] == "web":
+        st.info("🌐 NOT FROM THE PDF — answered from web search results (see sources below)")
     else:
         st.warning("⚠ NOT FROM THE PDF — answered from the model's general knowledge")
+        if data.get("web_search_error"):
+            st.caption(f"Web search was tried but not used: {data['web_search_error']}")
     st.markdown(data["answer"])
 
     cols = st.columns(4)
@@ -115,6 +120,11 @@ def render_answer(data: dict):
                 tag = " 🖼 from image" if src["kind"] == "image" else ""
                 st.markdown(f"**[{i}] {src['source']} — page {src['page']}**{tag} · relevance {src['rerank_score']:.2f}")
                 st.caption(src["text"][:500])
+    if data["web_sources"]:
+        with st.expander(f"Web sources ({len(data['web_sources'])})"):
+            for i, web in enumerate(data["web_sources"], start=1):
+                st.markdown(f"**[{i}] [{web['title']}]({web['url']})**")
+                st.caption(web["content"][:400])
     with st.expander("How was this decided?"):
         st.write(data["verdict_reason"])
         st.code(" → ".join(data["path"]), language=None)

@@ -26,6 +26,12 @@ class Settings:
         self.azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
         self.llm_timeout_s = 60
 
+        # --- Web search (Tavily). Used only for questions the PDF does not cover; blank key = disabled. ---
+        self.tavily_api_key = os.getenv("TAVILY_API_KEY", "")
+        self.tavily_base_url = os.getenv("TAVILY_BASE_URL", "https://api.tavily.com")   # overridable so tests can use a local fake
+        self.web_max_results = 4
+        self.web_timeout_s = 15
+
         # --- Local models (FastEmbed / ONNX) ---
         self.embed_model = "BAAI/bge-small-en-v1.5"
         self.rerank_model = "Xenova/ms-marco-MiniLM-L-12-v2"
@@ -80,6 +86,10 @@ class Settings:
         self.gate_dir = BASE_DIR / "models" / "gate" / self.gate_version
         self.gate_model_path = self.gate_dir / "gate.joblib"
         self.gate_data_dir = BASE_DIR / "data" / "gate"
+
+    @property
+    def web_search_enabled(self) -> bool:
+        return bool(self.tavily_api_key)
 
     @property
     def azure_enabled(self) -> bool:

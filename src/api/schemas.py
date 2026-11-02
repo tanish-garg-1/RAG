@@ -21,6 +21,12 @@ class Source(BaseModel):
     text: str
 
 
+class WebSource(BaseModel):
+    title: str
+    url: str
+    content: str
+
+
 class Contribution(BaseModel):
     feature: str
     description: str
@@ -43,6 +49,9 @@ class ChatResponse(BaseModel):
     top_score: float
     provider: str | None
     persona: str
+    answer_source: Literal["pdf", "web", "model"]   # where the facts came from; the UI banner follows this
+    web_sources: list[WebSource] = []
+    web_search_error: str | None = None
     path: list[str]
     rewritten_queries: list[str]
     sources: list[Source]
@@ -66,3 +75,4 @@ class HealthResponse(BaseModel):
     gate_version: str | None
     groq_configured: bool
     azure_configured: bool
+    web_search_configured: bool

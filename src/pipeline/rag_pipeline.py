@@ -3,6 +3,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Callable
 
+from config import settings
 from src.gate.gate import AnswerabilityGate
 from src.generation.llm_router import LLMRouter
 from src.graph.build import build_rag_graph
@@ -15,6 +16,7 @@ from src.ingestion.pdf_loader import PDFLoader
 from src.models import RAGResult
 from src.pipeline.scope_checker import ScopeChecker
 from src.retrieval.retriever import Retriever
+from src.search.web_search import TavilySearch
 from src.vision.describer import build_describer
 
 
@@ -129,7 +131,8 @@ class RAGPipeline:
     @property
     def graph(self):
         if self._graph is None:
-            nodes = RAGNodes(self.retriever, self.scope_checker, self.llm)
+            web = TavilySearch() if settings.web_search_enabled else None
+            nodes = RAGNodes(self.retriever, self.scope_checker, self.llm, web)
             self._graph = build_rag_graph(nodes)
         return self._graph
 
@@ -162,6 +165,8 @@ class RAGPipeline:
             path=path,
             provider=self.llm.last_provider,
             persona=persona,
+            web_sources=state.get("web_sources", []),
+            web_error=state.get("web_error"),
         )
 
     def explain(self, result: RAGResult) -> dict | None:

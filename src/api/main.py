@@ -10,7 +10,7 @@ from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
 
 from config import settings
 from src.analytics.query_logger import QueryLogger
-from src.api.schemas import ChatRequest, ChatResponse, Explanation, HealthResponse, IngestResponse, Source
+from src.api.schemas import ChatRequest, ChatResponse, Explanation, HealthResponse, IngestResponse, Source, WebSource
 from src.monitoring import metrics
 
 MAX_UPLOAD_MB = 50
@@ -57,6 +57,7 @@ def create_app(pipeline=None, query_logger: QueryLogger | None = None, warm_up: 
             gate_version=p.gate.version if p.gate else None,
             groq_configured=bool(settings.groq_api_key),
             azure_configured=settings.azure_enabled,
+            web_search_configured=settings.web_search_enabled,
         )
 
     @app.get("/documents")
@@ -111,6 +112,8 @@ def create_app(pipeline=None, query_logger: QueryLogger | None = None, warm_up: 
         logger.log(result, usage)
         metrics.QUESTIONS.labels("in_pdf" if result.verdict.in_pdf else "out_of_pdf").inc()
         metrics.LLM_PROVIDER.labels(result.provider or "unknown").inc()
+        if result.web_sources or result.web_error:
+            metrics.WEB_SEARCHES.labels("ok" if result.web_sources else "failed").inc()
         if fell_back:
             metrics.FALLBACKS.inc()
         metrics.LATENCY.observe(time.perf_counter() - start)
@@ -124,6 +127,9 @@ def create_app(pipeline=None, query_logger: QueryLogger | None = None, warm_up: 
             top_score=result.verdict.top_score,
             provider=result.provider,
             persona=result.persona,
+            answer_source=result.answer_source,
+            web_sources=[WebSource(title=w.title, url=w.url, content=w.content) for w in result.web_sources],
+            web_search_error=result.web_error,
             path=result.path,
             rewritten_queries=result.rewritten_queries,
             sources=[
@@ -148,6 +154,7 @@ def create_app(pipeline=None, query_logger: QueryLogger | None = None, warm_up: 
             "decided_by": dict(Counter(r["method"] for r in records)),
             "providers": dict(Counter(r.get("provider") or "unknown" for r in records)),
             "personas": dict(Counter(r.get("persona", "default") for r in records)),
+            "answer_sources": dict(Counter(r.get("answer_source", "pdf" if r["in_pdf"] else "model") for r in records)),
             "latency_ms": {
                 "avg": sum(totals) / len(totals) if totals else 0,
                 "p95": totals[int(0.95 * (len(totals) - 1))] if totals else 0,

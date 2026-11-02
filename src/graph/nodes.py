@@ -2,7 +2,8 @@ import time
 
 from config import settings
 from src.generation.prompts import (
-    IN_PDF_PROMPT, OUT_OF_PDF_PROMPT, REWRITE_QUERY_PROMPT, in_pdf_user_prompt, rewrite_user_prompt, with_persona,
+    IN_PDF_PROMPT, OUT_OF_PDF_PROMPT, REWRITE_QUERY_PROMPT, WEB_PROMPT,
+    in_pdf_user_prompt, rewrite_user_prompt, web_user_prompt, with_persona,
 )
 from src.graph.state import RAGState, add_timing
 
@@ -10,10 +11,11 @@ from src.graph.state import RAGState, add_timing
 class RAGNodes:
     """Each method is one graph node: it reads the state and returns only the keys it changes."""
 
-    def __init__(self, retriever, scope_checker, llm):
+    def __init__(self, retriever, scope_checker, llm, web_search=None):
         self.retriever = retriever
         self.scope_checker = scope_checker
         self.llm = llm
+        self.web_search_client = web_search   # None = web search disabled, the graph then has no web_search node
 
     def retrieve(self, state: RAGState) -> dict:
         timings = dict(state.get("timings_ms", {}))
@@ -48,9 +50,25 @@ class RAGNodes:
         )
         return {"answer": answer, "timings_ms": add_timing(state, "llm_ms", (time.perf_counter() - start) * 1000)}
 
+    def web_search(self, state: RAGState) -> dict:
+        start = time.perf_counter()
+        try:
+            results = self.web_search_client.search(state["question"])   # the original question, not a PDF-oriented rewrite
+        except Exception as exc:   # deliberately broad: any search failure must degrade to the model's own knowledge
+            return {"web_sources": [], "web_error": f"{type(exc).__name__}: {str(exc)[:150]}",
+                    "timings_ms": add_timing(state, "web_ms", (time.perf_counter() - start) * 1000)}
+        update = {"web_sources": results, "timings_ms": add_timing(state, "web_ms", (time.perf_counter() - start) * 1000)}
+        if not results:
+            update["web_error"] = "Web search returned no usable results."
+        return update
+
     def generate_general(self, state: RAGState) -> dict:
         start = time.perf_counter()
-        answer = self.llm.complete(with_persona(OUT_OF_PDF_PROMPT, state.get("persona")), state["question"])
+        if state.get("web_sources"):
+            system, user = WEB_PROMPT, web_user_prompt(state["question"], state["web_sources"])
+        else:
+            system, user = OUT_OF_PDF_PROMPT, state["question"]
+        answer = self.llm.complete(with_persona(system, state.get("persona")), user)
         return {"answer": answer, "timings_ms": add_timing(state, "llm_ms", (time.perf_counter() - start) * 1000)}
 
 

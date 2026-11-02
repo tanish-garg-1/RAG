@@ -145,6 +145,16 @@ to the system prompt (`PERSONAS` in `src/generation/prompts.py`). The grounding 
 Set `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` in `.env` to enable it; without them the backup is simply absent
 and a Groq failure surfaces as a clear error. The answer reports which provider wrote it, and `/stats` and `/metrics` count fallbacks.
 
+## Web search for out-of-PDF questions (Tavily)
+
+When the gate decides the PDF does not cover a question, the app can search the web with [Tavily](https://tavily.com) and answer from the results,
+citing them as [1], [2] with clickable links (the UI shows a blue "answered from web search" banner). Set `TAVILY_API_KEY` in `.env` to enable it.
+
+- Only the question text is sent to Tavily, and only for out-of-PDF questions. PDF content never leaves the machine.
+- Search results are treated as untrusted data: the prompt tells the model never to follow instructions found in them.
+- If Tavily is down, rate-limited or finds nothing, the app falls back to the model's own knowledge (yellow banner) and says why.
+- Without a key nothing changes: out-of-PDF answers come from model knowledge, flagged "NOT FROM THE PDF".
+
 ## Answerability gate and explainability
 
 The in-PDF / out-of-PDF decision used to be two hand-picked thresholds on the reranker score. It is now a trained classifier
@@ -184,6 +194,7 @@ src/indexing/               embeddings, ChromaDB, BM25
 src/retrieval/              RRF fusion, reranker, retriever
 src/generation/             Groq client and prompts
 src/graph/                  LangGraph state, nodes and graph wiring
+src/search/                 Tavily web search client
 src/vision/                 Gemini / Ollama providers, fallback and cache for image descriptions
 src/pipeline/               scope checker, ingestion and graph runner
 src/analytics/              terminal display and query log

@@ -4,7 +4,7 @@ import pymupdf
 from fastapi.testclient import TestClient
 
 from src.api.main import create_app
-from src.models import Chunk, RAGResult, RetrievedChunk, ScopeVerdict
+from src.models import Chunk, RAGResult, RetrievedChunk, ScopeVerdict, WebResult
 
 
 class FakeStore:
@@ -25,7 +25,8 @@ class FakeLLM:
 
 
 class FakePipeline:
-    def __init__(self, chunks=3, fail=False):
+    def __init__(self, chunks=3, fail=False, web=False):
+        self.web = web
         self.vector_store = FakeStore(chunks)
         self.gate = None
         self.llm = FakeLLM()
@@ -37,6 +38,10 @@ class FakePipeline:
             raise RuntimeError("All LLM providers failed.")
         self.personas.append(persona)
         chunk = RetrievedChunk(Chunk("c", "Monopolies matter.", "doc.pdf", 7), rerank_score=0.9)
+        if self.web:
+            return RAGResult(question, "Canberra [1].", ScopeVerdict(False, 0.0, "low_score", "weak"), [chunk],
+                             {"total_ms": 12.0}, [], ["retrieve", "check_scope", "web_search", "generate_general"], "groq", persona,
+                             web_sources=[WebResult("Canberra", "https://a.example/c", "Canberra is the capital.")])
         return RAGResult(question, "Because [p. 7].", ScopeVerdict(True, 0.9, "high_score", "strong"), [chunk],
                          {"total_ms": 12.0}, [], ["retrieve", "check_scope", "generate_from_pdf"], "groq", persona)
 
@@ -139,3 +144,14 @@ def test_ingest_success_saves_file_and_sanitises_the_name(tmp_path, monkeypatch)
     response = c.post("/ingest", files={"file": ("../../evil.pdf", doc.tobytes(), "application/pdf")})
     assert response.status_code == 200 and response.json()["source"] == "evil.pdf"
     assert [p.name for p in tmp_path.iterdir()] == ["evil.pdf"]
+
+
+def test_chat_reports_where_the_answer_came_from():
+    c, _ = client(FakePipeline())
+    assert c.post("/chat", json={"question": "q"}).json()["answer_source"] == "pdf"
+
+    c, _ = client(FakePipeline(web=True))
+    body = c.post("/chat", json={"question": "capital of Australia?"}).json()
+    assert body["answer_source"] == "web" and body["in_pdf"] is False
+    assert body["web_sources"][0]["url"] == "https://a.example/c" and body["web_search_error"] is None
+    assert 'rag_web_searches_total{outcome="ok"} 1.0' in c.get("/metrics").text

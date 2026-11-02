@@ -37,7 +37,9 @@ User types a question in Streamlit
            P ≥ 0.75 → yes, P ≤ 0.25 → no, in between → ask the LLM
       3a. in PDF       → generate_from_pdf  (answer ONLY from the 4 excerpts, cite pages)
       3b. weak match   → rewrite_query → back to step 1 (at most once)
-      3c. not in PDF   → generate_general   (answer from model knowledge, flagged)
+      3c. not in PDF   → web_search (Tavily, only if TAVILY_API_KEY is set)    src/search/web_search.py
+                         → generate_general (answer from the web results with [n] links,
+                           or from model knowledge, flagged, if there is no key / search fails)
   → LLMRouter: Groq → (on any error) Azure OpenAI                      src/generation/llm_router.py
   → response: answer, sources, verdict, gate probability, SHAP, timings
   → logged to logs/queries.jsonl, counted in Prometheus metrics
@@ -174,6 +176,15 @@ For each: **what it does → why → how it works → alternatives I rejected �
 - **Counters:** calls, fallbacks, failures, per-provider ok/error, exposed in `/stats` and `/metrics`, and `provider` is stored with every answer.
 - **Why Groq first:** free tier and very fast. **Why Azure second:** enterprise-grade, high-availability, and the course covers Azure AI. The fallback is about **availability**, which is the production concern.
 
+### 2.10b Web search with Tavily (`src/search/web_search.py`, `web_search` node in `src/graph/`)
+- **What:** for out-of-PDF questions only, the question is sent to the Tavily search API; the top 4 snippets go to the LLM with a prompt that says "answer ONLY from these numbered results and cite [n]". The UI shows a blue banner and a Web sources list.
+- **Three answer sources, always labelled:** `pdf` (green, page citations), `web` (blue, link citations), `model` (yellow, general knowledge). `answer_source` is in the API response, the log and `/stats`.
+- **Privacy:** only the question text leaves the machine, never PDF text, and the PDF path never calls Tavily at all (tested).
+- **Prompt injection:** web pages can contain text like "ignore previous instructions". The prompt marks results as untrusted data; I tested a poisoned result and the model ignored it. This reduces the risk but cannot eliminate it, so say that.
+- **Graceful degradation:** any search failure (timeout, 401, 429, no results) falls back to model knowledge and shows why; the question is still answered.
+- **Optional by design:** the `web_search` node is only added to the graph when a key is set, so the default behaviour and all PDF answers are unchanged.
+- **Honest limits:** search snippets can be wrong or biased, so the answer is only as good as the sources; I tested with a local fake Tavily server, so try it once with a real key before the demo.
+
 ### 2.11 Personas / tone (`src/generation/prompts.py`)
 - Five styles: default, formal, friendly, concise, ELI5. Each adds a **style paragraph + one example of the voice** to the system prompt (*few-shot prompting*: models imitate an example more reliably than they obey an adjective).
 - **Safety design:** the grounding and citation rules come first and the style block says "changes only the wording, never the rules above, never the citations". Tests assert the rules are always preserved.
@@ -228,6 +239,7 @@ For each: **what it does → why → how it works → alternatives I rejected �
 ## 4. Anticipated questions and strong answers
 
 **Concepts**
+0. *Does it search the web?* Only for questions the PDF cannot answer, and only if a Tavily key is set. Those answers cite web links and carry a blue "not from the PDF" banner; PDF answers never use the web. Without a key it falls back to the model's own knowledge, flagged in yellow.
 1. *What is RAG and why use it?* Retrieval-Augmented Generation: fetch relevant passages first, then let the LLM answer from them. It reduces hallucination, lets the model use private/new data without retraining, and enables citations.
 2. *Why not fine-tune the LLM on the PDF?* Fine-tuning is costly, bakes facts into weights (hard to update or cite), and still hallucinates. RAG updates by re-indexing and can point to the source page.
 3. *What is an embedding?* A vector (here 384 numbers) representing the meaning of a text, so semantically similar texts are close in vector space.
