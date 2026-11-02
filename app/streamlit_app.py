@@ -59,7 +59,7 @@ with st.sidebar:
     st.subheader("Add a PDF")
     upload = st.file_uploader("PDF file", type=["pdf"], label_visibility="collapsed")
     with_images = st.checkbox("Describe figures with Gemini", value=False, help="Slower; uses Gemini quota.")
-    if upload and st.button("Ingest", use_container_width=True):
+    if upload and st.button("Ingest", width="stretch"):
         with st.spinner("Extracting, embedding and indexing..."):
             result, err = api("POST", f"/ingest?images={str(with_images).lower()}", timeout=900,
                               files={"file": (upload.name, upload.getvalue(), "application/pdf")})
@@ -69,7 +69,7 @@ with st.sidebar:
             st.success(f"{result['source']}: {result['pages']} pages, {result['chunks']} chunks in {result['seconds']:.0f}s")
             st.rerun()
 
-    if st.button("Clear chat", use_container_width=True):
+    if st.button("Clear chat", width="stretch"):
         st.session_state.pop("messages", None)
         st.rerun()
 
@@ -92,7 +92,7 @@ def render_explanation(explanation: dict):
     st.caption("Bars are SHAP values in probability units. They add up exactly to (final − average).")
     st.dataframe(
         frame[["feature", "description", "value", "shap"]].rename(columns={"shap": "SHAP"}),
-        use_container_width=True, hide_index=True,
+        width="stretch", hide_index=True,
     )
 
 
@@ -133,6 +133,8 @@ with chat_tab:
         with st.chat_message(message["role"]):
             if message["role"] == "user":
                 st.markdown(message["content"])
+            elif "error" in message:
+                st.error(message["error"])
             else:
                 render_answer(message["data"])
 
@@ -143,11 +145,8 @@ with chat_tab:
         with st.chat_message("assistant"):
             with st.spinner("Searching, checking scope, writing the answer..."):
                 data, err = api("POST", "/chat", json={"question": question, "persona": persona, "explain": explain})
-            if err:
-                st.error(err)
-            else:
-                render_answer(data)
-                st.session_state.messages.append({"role": "assistant", "data": data})
+        st.session_state.messages.append({"role": "assistant", "error": err} if err else {"role": "assistant", "data": data})
+        st.rerun()   # redraw from history so the input box stays below the newest answer
 
 with monitor_tab:
     if st.button("Refresh"):
@@ -179,7 +178,7 @@ with monitor_tab:
                 f"{llm['failures']} total failures · per provider {llm['by_provider']}"
             )
         st.subheader("Recent questions")
-        st.dataframe(pd.DataFrame(stats["recent"]), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(stats["recent"]), width="stretch", hide_index=True)
 
     gate = (stats or {}).get("gate") if not err else None
     if gate:

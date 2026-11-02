@@ -1,4 +1,5 @@
 import shutil
+import tempfile
 import threading
 import time
 from collections import Counter
@@ -69,20 +70,23 @@ def create_app(pipeline=None, query_logger: QueryLogger | None = None, warm_up: 
         name = Path(file.filename or "").name
         if not name.lower().endswith(".pdf"):
             raise HTTPException(400, "Only .pdf files are accepted.")
-        settings.pdf_dir.mkdir(parents=True, exist_ok=True)
-        target = settings.pdf_dir / name
-        with open(target, "wb") as out:
-            shutil.copyfileobj(file.file, out)
-        if target.stat().st_size > MAX_UPLOAD_MB * 1024 * 1024:
-            target.unlink()
-            raise HTTPException(413, f"File is larger than {MAX_UPLOAD_MB} MB.")
+        # The upload is staged in a temp folder and only copied into the PDF folder once ingest succeeds,
+        # so a corrupt upload can neither leave junk behind nor overwrite a good file of the same name.
+        with tempfile.TemporaryDirectory() as staging:
+            staged = Path(staging) / name
+            with open(staged, "wb") as out:
+                shutil.copyfileobj(file.file, out)
+            if staged.stat().st_size > MAX_UPLOAD_MB * 1024 * 1024:
+                raise HTTPException(413, f"File is larger than {MAX_UPLOAD_MB} MB.")
 
-        with lock:
-            try:
-                stats = get_pipeline().ingest(str(target), describe_images=images)
-            except ValueError as exc:   # e.g. a scanned PDF with no text and no vision provider
-                metrics.ERRORS.labels("ingest").inc()
-                raise HTTPException(422, str(exc))
+            with lock:
+                try:
+                    stats = get_pipeline().ingest(str(staged), describe_images=images)
+                except ValueError as exc:   # unreadable PDF, or a scanned PDF with no text and no vision provider
+                    metrics.ERRORS.labels("ingest").inc()
+                    raise HTTPException(422, str(exc))
+            settings.pdf_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(staged, settings.pdf_dir / name)
         metrics.INGESTS.inc()
         return IngestResponse(**{k: stats[k] for k in ("source", "pages", "chunks", "image_chunks", "seconds", "total_chunks")})
 

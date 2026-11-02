@@ -1,11 +1,13 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 Persona = Literal["default", "formal", "friendly", "concise", "eli5"]
 
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)   # a whitespace-only question becomes empty and is rejected
+
     question: str = Field(min_length=1, max_length=2000)
     persona: Persona = "default"
     explain: bool = Field(False, description="Include the SHAP breakdown of the in-PDF decision.")

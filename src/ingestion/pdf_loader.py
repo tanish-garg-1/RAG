@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from pathlib import Path
 
 import pymupdf
 
@@ -11,7 +12,11 @@ MAX_IMAGE_SIDE = 2000  # larger images are shrunk before upload; vision models d
 class PDFLoader:
     def load(self, pdf_path: str) -> list[tuple[int, str]]:
         pages = []
-        doc = pymupdf.open(pdf_path)
+        try:
+            # Opening from bytes (not the path) means a corrupt file never stays locked, which matters on Windows.
+            doc = pymupdf.open(stream=Path(pdf_path).read_bytes(), filetype="pdf")
+        except pymupdf.FileDataError as exc:   # also covers EmptyFileError
+            raise ValueError(f"{Path(pdf_path).name} is not a readable PDF ({exc}).") from exc
 
         for page_number, page in enumerate(doc, start=1):
             text = page.get_text()

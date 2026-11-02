@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import pymupdf
 from fastapi.testclient import TestClient
 
 from src.api.main import create_app
@@ -102,3 +105,37 @@ def test_metrics_endpoint_exposes_prometheus_text():
     c.post("/chat", json={"question": "hi"})
     text = c.get("/metrics").text
     assert 'rag_questions_total{verdict="in_pdf"}' in text and "rag_answer_seconds_bucket" in text
+
+
+def test_chat_rejects_whitespace_only_question():
+    c, _ = client(FakePipeline())
+    assert c.post("/chat", json={"question": "   \n "}).status_code == 422
+
+
+class IngestingPipeline(FakePipeline):
+    """Uses the real PDF loader so corrupt files fail the same way they do in production."""
+
+    def ingest(self, path, describe_images=False):
+        from src.ingestion.pdf_loader import PDFLoader
+        pages = PDFLoader().load(path)
+        return {"source": Path(path).name, "pages": len(pages), "chunks": 1, "image_chunks": 0,
+                "seconds": 0.0, "total_chunks": 1}
+
+
+def test_ingest_unreadable_pdf_is_422_and_leaves_no_file(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.api.main.settings.pdf_dir", tmp_path)
+    c, _ = client(IngestingPipeline())
+    for payload in (b"this is not a pdf", b""):
+        response = c.post("/ingest", files={"file": ("bad.pdf", payload, "application/pdf")})
+        assert response.status_code == 422 and "not a readable PDF" in response.json()["detail"]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_ingest_success_saves_file_and_sanitises_the_name(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.api.main.settings.pdf_dir", tmp_path)
+    doc = pymupdf.open()
+    doc.new_page().insert_text((72, 72), "hello world")
+    c, _ = client(IngestingPipeline())
+    response = c.post("/ingest", files={"file": ("../../evil.pdf", doc.tobytes(), "application/pdf")})
+    assert response.status_code == 200 and response.json()["source"] == "evil.pdf"
+    assert [p.name for p in tmp_path.iterdir()] == ["evil.pdf"]
