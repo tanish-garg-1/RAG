@@ -7,7 +7,7 @@ from src.models import PageImage
 
 MAX_IMAGE_SIDE = 2000  # larger images are shrunk before upload; vision models downscale them anyway
 
-
+ 
 class PDFLoader:
     def load(self, pdf_path: str) -> list[tuple[int, str]]:
         pages = []

@@ -1,0 +1,91 @@
+What is the capital of Australia?
+How do I make sourdough bread at home?
+Who won the 2018 FIFA World Cup?
+Explain how photosynthesis works.
+What is the boiling point of water at the top of Mount Everest?
+How many bones are in the adult human body?
+Write a Python function that reverses a string.
+What causes the northern lights?
+How does a refrigerator work?
+Who painted the Mona Lisa?
+What is the speed of light in a vacuum?
+How do vaccines train the immune system?
+What is the difference between a virus and a bacterium?
+Which planet has the most moons?
+How do I change a flat tire?
+What is the formula for the area of a circle?
+Explain the rules of cricket.
+What is the tallest mountain in Africa?
+How does compound interest work for a savings account?
+What are the symptoms of the common cold?
+Who wrote the novel Pride and Prejudice?
+How many players are on a basketball team?
+What is the chemical symbol for gold?
+Explain how a bill becomes law in the United States.
+What is the population of Japan?
+How do airplanes stay in the air?
+What is the plot of Romeo and Juliet?
+How long does it take to boil an egg?
+What is machine learning? | machine learning
+Translate hello into Spanish.
+What year did the Berlin Wall fall? | Berlin Wall
+How do I install Python on Windows?
+What is the largest ocean on Earth?
+Explain the theory of evolution by natural selection.
+What are the health benefits of regular exercise?
+How does GPS determine a location?
+Who discovered penicillin? | penicillin
+What is the difference between weather and climate?
+How do I write a good cover letter?
+What is the function of the mitochondria?
+Which countries border Switzerland?
+What is the Pythagorean theorem?
+How does a blockchain work?
+What is the best way to learn to swim?
+Who is the author of the Harry Potter series?
+What is the freezing point of water in Fahrenheit?
+Explain what an API is.
+How do tides work?
+What is the main ingredient in guacamole?
+Who was the first person to walk on the moon?
+What is the difference between stocks and bonds?
+How does the stock market index S&P 500 get calculated?
+What is the recommended daily intake of vitamin C?
+How do I train a puppy to sit?
+What languages are spoken in India?
+What are black holes?
+How many minutes are in a week?
+What is the capital of Canada?
+Explain the water cycle.
+What is Bitcoin's current price?
+Who composed the Four Seasons?
+What is the difference between RAM and storage?
+How do solar panels generate electricity?
+What is the longest river in South America?
+Describe the main causes of World War I.
+What is the GDP of Germany?
+How do I tie a tie?
+What is the boiling point of ethanol?
+What does DNA stand for?
+How do noise-cancelling headphones work?
+Who invented the telephone?
+What are the primary colors?
+What is a haiku?
+How do I convert Celsius to Kelvin?
+What is the weather like in Paris in July?
+Who is the current prime minister of the United Kingdom?
+What happened in the French Revolution?
+How does a car engine work?
+What is the best programming language for beginners?
+How do I calculate the mean and median of a dataset?
+What is the tallest building in the world?
+How do bees make honey?
+Explain Newton's three laws of motion.
+What is an IPv6 address?
+How many calories are in an apple?
+Which team won the last NBA championship?
+What should I pack for a week-long trip to Iceland?
+How does Wi-Fi work?
+What is the Fibonacci sequence?
+What is the difference between a crocodile and an alligator?
+Describe the plot of the movie Inception.

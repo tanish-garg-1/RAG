@@ -117,6 +117,57 @@ roughly 2–3k tokens, so several quick questions in a row can hit the limit. Wh
 waits and retries automatically, and answers take 10–30 s instead of 1–2 s. To change models, set
 `GROQ_MODEL` in `.env`.
 
+## Web app: API + UI
+
+```bash
+uvicorn src.api.main:app --port 8000        # backend  (Swagger docs at http://localhost:8000/docs)
+streamlit run app/streamlit_app.py          # UI       (http://localhost:8501)
+```
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /ingest` | upload a PDF (`?images=true` to describe figures with Gemini) |
+| `POST /chat` | `{question, persona, explain}` → answer, verdict, sources, timings, optional SHAP breakdown |
+| `GET /documents`, `/health`, `/stats` | index contents, readiness, dashboard data |
+| `GET /metrics` | Prometheus metrics (questions by verdict, answers by provider, fallbacks, latency histogram) |
+
+The UI has three tabs: **Chat** (answer style picker, sources, "How was this decided?" with the SHAP chart),
+**Monitoring** (verdicts, LLM providers, latency, recent questions, gate metrics) and **About**.
+
+## Answer styles
+
+`persona` is `default`, `formal`, `friendly`, `concise` or `eli5`. Each adds a style instruction plus one example of the voice
+to the system prompt (`PERSONAS` in `src/generation/prompts.py`). The grounding and citation rules always come first and cannot be overridden.
+
+## LLM fallback (Groq → Azure OpenAI)
+
+`src/generation/llm_router.py` tries Groq first. If it raises for any reason (rate limit, timeout, outage), the same request goes to Azure OpenAI.
+Set `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` in `.env` to enable it; without them the backup is simply absent
+and a Groq failure surfaces as a clear error. The answer reports which provider wrote it, and `/stats` and `/metrics` count fallbacks.
+
+## Answerability gate and explainability
+
+The in-PDF / out-of-PDF decision used to be two hand-picked thresholds on the reranker score. It is now a trained classifier
+(`src/gate/`) over nine retrieval signals (top score, score gap, embedding similarity, keyword hit, question/passage word overlap, ...).
+
+```bash
+python -m ml.build_gate_dataset       # in-PDF questions written by the LLM from random passages + 113 verified not-in-PDF questions
+python -m ml.train_gate               # clean, split, 5-fold CV of two models, evaluate, compare with the old rule, save to models/gate/v1/
+python -m ml.bias_check               # error rates by question length and opening word
+```
+
+Outputs in `models/gate/v1/`: `gate.joblib`, `metrics.json` (CV, test, baseline), `shap_summary.png`, `bias_report.json`.
+Without a trained gate the app falls back to the old thresholds, so nothing breaks.
+Every decision can be explained with **SHAP** (`"explain": true` on `/chat`): exact Shapley values show how much each signal pushed
+the probability toward or away from "in the PDF", and they sum to the final probability.
+
+## Docker
+
+```bash
+cp .env.example .env        # add your keys
+docker compose up --build   # API on :8000, UI on :8501; data/ and logs/ are mounted as volumes
+```
+
 ## Tests
 
 ```bash
@@ -136,5 +187,11 @@ src/graph/                  LangGraph state, nodes and graph wiring
 src/vision/                 Gemini / Ollama providers, fallback and cache for image descriptions
 src/pipeline/               scope checker, ingestion and graph runner
 src/analytics/              terminal display and query log
-tests/                      chunker, RRF, scope-checker and graph-routing tests
+src/gate/                   answerability classifier: features, loading, SHAP explanations
+src/api/                    FastAPI app and request/response schemas
+src/monitoring/             Prometheus metrics
+app/streamlit_app.py        web UI
+ml/                         gate dataset builder, training, bias check
+models/gate/               versioned trained gate + metrics + plots
+tests/                      chunker, RRF, scope-checker, graph-routing, router-fallback, gate/SHAP and API tests (no keys or network needed)
 ```

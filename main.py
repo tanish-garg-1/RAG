@@ -27,7 +27,7 @@ NEXT_STEP_LABELS = {
 def run_question(pipeline, logger, question: str, show_scores: bool):
     with console.status("Searching the PDF...") as status:
         result = pipeline.answer(question, on_step=lambda node: status.update(NEXT_STEP_LABELS.get(node, "Working...")))
-    logger.log(result, pipeline.groq_client.last_usage)
+    logger.log(result, pipeline.llm.last_usage)
     show_result(result, show_scores=show_scores)
     return result
 

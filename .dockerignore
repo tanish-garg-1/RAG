@@ -1,0 +1,13 @@
+rag_env/
+.git/
+.github/
+.claude/
+.vscode/
+.pytest_cache/
+__pycache__/
+*.pyc
+.env
+data/
+logs/
+tests/
+docs/

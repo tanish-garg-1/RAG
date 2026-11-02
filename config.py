@@ -19,6 +19,13 @@ class Settings:
         self.groq_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
         self.llm_temperature = 0.2
 
+        # --- Backup LLM (Azure OpenAI). Used only when Groq fails; all four values must be set. ---
+        self.azure_api_key = os.getenv("AZURE_OPENAI_API_KEY", "")
+        self.azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        self.azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
+        self.azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
+        self.llm_timeout_s = 60
+
         # --- Local models (FastEmbed / ONNX) ---
         self.embed_model = "BAAI/bge-small-en-v1.5"
         self.rerank_model = "Xenova/ms-marco-MiniLM-L-12-v2"
@@ -46,6 +53,12 @@ class Settings:
         self.max_rewrites = 1
         self.retry_min_score = 0.005
 
+        # --- Answerability gate (trained classifier that replaces the fixed score thresholds) ---
+        # p(in PDF) >= gate_allow -> in PDF, <= gate_deny -> out of PDF, in between -> ask the LLM (as before).
+        self.gate_version = os.getenv("GATE_VERSION", "v1")
+        self.gate_allow = 0.75
+        self.gate_deny = 0.25
+
         # --- Vision (image / scanned-page understanding at ingest time) ---
         # Gemini is tried first; when its quota runs out, a local Ollama model takes over.
         self.gemini_api_key = os.getenv("GEMINI_API_KEY", "")
@@ -64,6 +77,13 @@ class Settings:
         self.query_log_path = BASE_DIR / "logs" / "queries.jsonl"
         self.collection_name = "pdf_chunks"
         self.vision_cache_path = BASE_DIR / "data" / "vision_cache.json"
+        self.gate_dir = BASE_DIR / "models" / "gate" / self.gate_version
+        self.gate_model_path = self.gate_dir / "gate.joblib"
+        self.gate_data_dir = BASE_DIR / "data" / "gate"
+
+    @property
+    def azure_enabled(self) -> bool:
+        return bool(self.azure_api_key and self.azure_endpoint and self.azure_deployment)
 
 
 settings = Settings()

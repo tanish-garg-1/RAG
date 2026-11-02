@@ -8,3 +8,5 @@ logs/
 *.pkl
 .pytest_cache/
 data/vision_cache.json
+data/gate/
+.ruff_cache/

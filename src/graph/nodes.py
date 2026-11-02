@@ -2,7 +2,7 @@ import time
 
 from config import settings
 from src.generation.prompts import (
-    IN_PDF_PROMPT, OUT_OF_PDF_PROMPT, REWRITE_QUERY_PROMPT, in_pdf_user_prompt, rewrite_user_prompt,
+    IN_PDF_PROMPT, OUT_OF_PDF_PROMPT, REWRITE_QUERY_PROMPT, in_pdf_user_prompt, rewrite_user_prompt, with_persona,
 )
 from src.graph.state import RAGState, add_timing
 
@@ -43,12 +43,14 @@ class RAGNodes:
 
     def generate_from_pdf(self, state: RAGState) -> dict:
         start = time.perf_counter()
-        answer = self.llm.complete(IN_PDF_PROMPT, in_pdf_user_prompt(state["question"], state["chunks"]))
+        answer = self.llm.complete(
+            with_persona(IN_PDF_PROMPT, state.get("persona")), in_pdf_user_prompt(state["question"], state["chunks"])
+        )
         return {"answer": answer, "timings_ms": add_timing(state, "llm_ms", (time.perf_counter() - start) * 1000)}
 
     def generate_general(self, state: RAGState) -> dict:
         start = time.perf_counter()
-        answer = self.llm.complete(OUT_OF_PDF_PROMPT, state["question"])
+        answer = self.llm.complete(with_persona(OUT_OF_PDF_PROMPT, state.get("persona")), state["question"])
         return {"answer": answer, "timings_ms": add_timing(state, "llm_ms", (time.perf_counter() - start) * 1000)}
 
 

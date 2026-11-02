@@ -1,0 +1,54 @@
+{
+  "version": "v1",
+  "trained_at": "2026-10-31T12:55:15+00:00",
+  "model": "logistic_regression",
+  "n_rows": 182,
+  "n_in_pdf": 69,
+  "cross_validation": {
+    "logistic_regression": {
+      "roc_auc_mean": 0.9835,
+      "roc_auc_std": 0.0329,
+      "f1_mean": 0.9541
+    },
+    "gradient_boosting": {
+      "roc_auc_mean": 0.9712,
+      "roc_auc_std": 0.0548,
+      "f1_mean": 0.9541
+    }
+  },
+  "test": {
+    "accuracy": 0.9783,
+    "precision": 1.0,
+    "recall": 0.9412,
+    "f1": 0.9697,
+    "roc_auc": 0.9574
+  },
+  "baseline_fixed_threshold": {
+    "accuracy": 0.9783,
+    "precision": 1.0,
+    "recall": 0.9412,
+    "f1": 0.9697,
+    "roc_auc": 0.998
+  },
+  "confusion_matrix": [
+    [
+      29,
+      0
+    ],
+    [
+      1,
+      16
+    ]
+  ],
+  "features": [
+    "top_rerank",
+    "rerank_gap",
+    "mean_rerank",
+    "n_relevant",
+    "top_dense",
+    "max_bm25",
+    "top_in_bm25",
+    "q_words",
+    "q_overlap"
+  ]
+}

@@ -5,6 +5,7 @@ from src.models import RetrievedChunk, ScopeVerdict
 
 class RAGState(TypedDict, total=False):
     question: str                  # the user's original question, never modified
+    persona: str                   # answer style: default | formal | friendly | concise | eli5
     search_query: str              # what retrieval actually searches for (rewritten on retry)
     rewritten_queries: list[str]   # every rewrite, in order
     chunks: list[RetrievedChunk]

@@ -3,7 +3,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Callable
 
-from src.generation.groq_client import GroqClient
+from src.gate.gate import AnswerabilityGate
+from src.generation.llm_router import LLMRouter
 from src.graph.build import build_rag_graph
 from src.graph.nodes import RAGNodes
 from src.indexing.bm25_store import BM25Store
@@ -25,21 +26,33 @@ class RAGPipeline:
         if not self.bm25_store.load() and self.vector_store.count() > 0:
             self.rebuild_bm25()
         self.retriever = Retriever(self.embedder, self.vector_store, self.bm25_store)
-        self._groq_client = None
+        self._llm = None
+        self._gate = None
+        self._gate_loaded = False
         self._scope_checker = None
         self._graph = None
 
-    # The Groq client is created lazily so `ingest` works without an API key.
+    # The router builds its provider clients lazily, so `ingest` works without any API key.
     @property
-    def groq_client(self) -> GroqClient:
-        if self._groq_client is None:
-            self._groq_client = GroqClient()
-        return self._groq_client
+    def llm(self) -> LLMRouter:
+        if self._llm is None:
+            self._llm = LLMRouter()
+        return self._llm
+
+    groq_client = llm   # old name, still used by main.py's usage logging
+
+    @property
+    def gate(self) -> AnswerabilityGate | None:
+        """The trained answerability model, or None (then fixed thresholds are used)."""
+        if not self._gate_loaded:
+            self._gate = AnswerabilityGate.load()
+            self._gate_loaded = True
+        return self._gate
 
     @property
     def scope_checker(self) -> ScopeChecker:
         if self._scope_checker is None:
-            self._scope_checker = ScopeChecker(self.groq_client)
+            self._scope_checker = ScopeChecker(self.llm, gate=self.gate)
         return self._scope_checker
 
     def ingest(self, pdf_path: str, describe_images: bool = True,
@@ -116,16 +129,19 @@ class RAGPipeline:
     @property
     def graph(self):
         if self._graph is None:
-            nodes = RAGNodes(self.retriever, self.scope_checker, self.groq_client)
+            nodes = RAGNodes(self.retriever, self.scope_checker, self.llm)
             self._graph = build_rag_graph(nodes)
         return self._graph
 
-    def answer(self, question: str, on_step: Callable[[str], None] | None = None) -> RAGResult:
-        """Run the LangGraph workflow. `on_step` is called with each node name as it finishes."""
+    def answer(self, question: str, on_step: Callable[[str], None] | None = None, persona: str = "default") -> RAGResult:
+        """Run the LangGraph workflow. `on_step` is called with each node name as it finishes.
+        `persona` picks the answer style (see PERSONAS in src/generation/prompts.py)."""
         graph = self.graph  # build before timing so Groq client setup isn't counted
         total_start = time.perf_counter()
 
-        state: dict = {"question": question, "search_query": question, "rewritten_queries": [], "timings_ms": {}}
+        state: dict = {
+            "question": question, "search_query": question, "rewritten_queries": [], "timings_ms": {}, "persona": persona,
+        }
         path: list[str] = []
         for update in graph.stream(state, stream_mode="updates"):
             for node, changes in update.items():
@@ -144,7 +160,13 @@ class RAGPipeline:
             timings_ms=timings,
             rewritten_queries=state["rewritten_queries"],
             path=path,
+            provider=self.llm.last_provider,
+            persona=persona,
         )
+
+    def explain(self, result: RAGResult) -> dict | None:
+        """SHAP breakdown of the in-PDF / out-of-PDF decision, or None when no gate is trained."""
+        return self.gate.explain(result.question, result.chunks) if self.gate else None
 
     def graph_mermaid(self) -> str:
         return self.graph.get_graph().draw_mermaid()

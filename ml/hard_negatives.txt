@@ -1,0 +1,30 @@
+What is a SAFE note and how does it convert into equity? | SAFE note
+How does Y Combinator choose which startups to fund? | Y Combinator
+What is the Black-Scholes model used for? | Black-Scholes
+How do I register an LLC in Delaware? | Delaware
+What is the current market valuation of Stripe? | Stripe
+How does Kubernetes schedule containers? | Kubernetes
+What is a unicorn startup and how many exist today? | unicorn
+How do I write a convertible note term sheet? | term sheet
+What is the Lean Canvas and how do I fill it in? | Lean Canvas
+How do OKRs work for a growing company? | OKR
+What is the difference between an angel investor and a venture capitalist? | angel investor
+How does Slack make money from its freemium model? | Slack
+What is Scrum and how long is a sprint? | Scrum
+How do I calculate customer acquisition cost? | acquisition cost
+What happened to WeWork's IPO? | WeWork
+How does Airbnb's dynamic pricing algorithm work? | dynamic pricing
+What is a cap table and how do I read one? | cap table
+How do stock options vest at a startup? | vesting
+What is the Net Promoter Score? | Net Promoter
+How does Shopify let merchants build online stores? | Shopify
+What is the Series A funding stage? | Series A
+How do I run an effective A/B test on a landing page? | A/B test
+What is the Ansoff matrix? | Ansoff
+How does Uber calculate surge pricing? | surge pricing
+What is product-market fit according to Marc Andreessen? | Andreessen
+How is a startup's burn rate calculated? | burn rate
+What is the Jobs To Be Done framework? | Jobs To Be Done
+How does Amazon Web Services price its cloud storage? | Amazon Web Services
+What does a chief technology officer do? | chief technology officer
+How does Spotify recommend music to listeners? | Spotify

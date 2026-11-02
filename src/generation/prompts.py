@@ -42,6 +42,37 @@ REWRITE_QUERY_PROMPT = (
 )
 
 
+# Tone / style control. Each persona is a style paragraph plus one short example of the voice
+# (few-shot): models imitate an example far more reliably than they follow an adjective.
+PERSONAS: dict[str, str] = {
+    "default": "",
+    "formal": (
+        "Write in a formal, professional register: complete sentences, no contractions, no slang.\n"
+        "Example voice: \"The author contends that monopolies, rather than competition, create durable value.\""
+    ),
+    "friendly": (
+        "Write in a warm, conversational tone, as a helpful colleague would. Contractions are fine.\n"
+        "Example voice: \"Good question! The author's big idea here is that real value comes from being unique.\""
+    ),
+    "concise": (
+        "Be extremely brief: at most three short sentences or bullets. No preamble.\n"
+        "Example voice: \"Monopolies create lasting value; competition erodes profit. (p. 23)\""
+    ),
+    "eli5": (
+        "Explain as if to a curious ten-year-old: very simple words, one everyday analogy, no jargon.\n"
+        "Example voice: \"Imagine the only lemonade stand in town: nobody else sells lemonade, so it can charge more.\""
+    ),
+}
+
+
+def with_persona(system_prompt: str, persona: str | None) -> str:
+    """Append the style instruction. The grounding and citation rules above it always win."""
+    style = PERSONAS.get(persona or "default", "")
+    if not style:
+        return system_prompt
+    return f"{system_prompt}\n\nSTYLE (changes only the wording, never the rules above, never the citations):\n{style}"
+
+
 def rewrite_user_prompt(question: str, previous_queries: list[str]) -> str:
     tried = "".join(f"\nAlready tried: {q}" for q in previous_queries)
     return f"Question: {question}{tried}"

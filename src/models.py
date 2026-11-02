@@ -35,8 +35,9 @@ class RetrievedChunk:
 class ScopeVerdict:
     in_pdf: bool
     top_score: float
-    method: str   # "high_score" | "low_score" | "llm_check" | "llm_check_failed" | "no_results"
+    method: str   # "high_score" | "low_score" | "gate_high" | "gate_low" | "llm_check" | "llm_check_failed" | "no_results"
     reason: str
+    gate_proba: float | None = None   # P(in PDF) from the trained gate, when one is loaded
 
 
 @dataclass
@@ -48,6 +49,8 @@ class RAGResult:
     timings_ms: dict[str, float] = field(default_factory=dict)
     rewritten_queries: list[str] = field(default_factory=list)
     path: list[str] = field(default_factory=list)   # graph nodes in the order they ran
+    provider: str | None = None                      # which LLM provider wrote the answer ("groq" / "azure")
+    persona: str = "default"
 
     @property
     def pages(self) -> list[int]:

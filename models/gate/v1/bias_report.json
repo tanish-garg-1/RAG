@@ -1,0 +1,64 @@
+{
+  "method": "5-fold out-of-fold predictions; slices with fewer than 8 rows are skipped",
+  "by_length": [
+    {
+      "slice": "short (≤6 words)",
+      "n": 45,
+      "accuracy": 0.933,
+      "false_negative_rate": 0.5,
+      "false_positive_rate": 0.024
+    },
+    {
+      "slice": "medium (7-9)",
+      "n": 61,
+      "accuracy": 0.984,
+      "false_negative_rate": 0.0,
+      "false_positive_rate": 0.018
+    },
+    {
+      "slice": "long (10+)",
+      "n": 76,
+      "accuracy": 0.974,
+      "false_negative_rate": 0.017,
+      "false_positive_rate": 0.062
+    }
+  ],
+  "by_opening_word": [
+    {
+      "slice": "how",
+      "n": 50,
+      "accuracy": 0.98,
+      "false_negative_rate": 0.0,
+      "false_positive_rate": 0.026
+    },
+    {
+      "slice": "what",
+      "n": 76,
+      "accuracy": 0.947,
+      "false_negative_rate": 0.087,
+      "false_positive_rate": 0.038
+    },
+    {
+      "slice": "who",
+      "n": 9,
+      "accuracy": 1.0,
+      "false_negative_rate": 0.0,
+      "false_positive_rate": 0.0
+    },
+    {
+      "slice": "why",
+      "n": 26,
+      "accuracy": 1.0,
+      "false_negative_rate": 0.0,
+      "false_positive_rate": null
+    }
+  ],
+  "by_length_gaps": {
+    "false_negative_rate": 0.5,
+    "false_positive_rate": 0.044
+  },
+  "by_opening_word_gaps": {
+    "false_negative_rate": 0.087,
+    "false_positive_rate": 0.038
+  }
+}
