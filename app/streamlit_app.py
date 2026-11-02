@@ -123,7 +123,8 @@ def render_answer(data: dict):
     if data["web_sources"]:
         with st.expander(f"Web sources ({len(data['web_sources'])})"):
             for i, web in enumerate(data["web_sources"], start=1):
-                st.markdown(f"**[{i}] [{web['title']}]({web['url']})**")
+                dated = f" · {web['published']}" if web.get("published") else ""
+                st.markdown(f"**[{i}] [{web['title']}]({web['url']})**{dated}")
                 st.caption(web["content"][:400])
     with st.expander("How was this decided?"):
         st.write(data["verdict_reason"])

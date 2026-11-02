@@ -1,3 +1,6 @@
+import json
+from datetime import date
+
 import httpx
 import pytest
 
@@ -7,7 +10,7 @@ from src.graph.build import build_rag_graph
 from src.graph.nodes import RAGNodes
 from src.models import Chunk, RAGResult, RetrievedChunk, ScopeVerdict, WebResult
 from src.pipeline.scope_checker import ScopeChecker
-from src.search.web_search import TavilySearch
+from src.search.web_search import TavilySearch, needs_fresh_results
 
 
 def tavily_client(handler):
@@ -65,8 +68,9 @@ class FakeWeb:
     def __init__(self, results=None, error=None):
         self.results, self.error, self.queries = results or [], error, []
 
-    def search(self, query):
+    def search(self, query, fresh=False):
         self.queries.append(query)
+        self.fresh = fresh
         if self.error:
             raise self.error
         return self.results
@@ -125,7 +129,115 @@ def test_web_prompt_marks_results_as_untrusted_and_numbers_them():
     assert "[1] A (https://a)" in prompt and "[2] B (https://b)" in prompt and prompt.endswith("Question: q?")
 
 
-@pytest.mark.parametrize("in_pdf, web, expected", [(True, [], "pdf"), (False, HITS, "web"), (False, [], "model")])
+@pytest.mark.parametrize("in_pdf, web, expected", [(True, [], "pdf"), (False, HITS, "web"), (False, [], "model"), (True, HITS, "web")])
 def test_answer_source(in_pdf, web, expected):
     verdict = ScopeVerdict(in_pdf, 0.1, "m", "r")
     assert RAGResult("q", "a", verdict, [], web_sources=web).answer_source == expected
+
+
+@pytest.mark.parametrize("question", [
+    "Tell me about the book", "What does page 5 say?", "Summarise this document", "Who is the author?",
+    "What is in chapter 3?", "Explain the main idea of this PDF",
+])
+def test_questions_about_the_pdf_itself_skip_web_search(question):
+    web = FakeWeb(HITS)
+    _, state, llm = run(0.0, web, question)
+    assert web.queries == [] and "skipped" in state["web_error"] and "general knowledge" in llm.calls[-1][0]
+
+
+@pytest.mark.parametrize("question", [
+    "What is the capital of Australia?", "Who wrote the book Dune?", "What is the current price of Bitcoin?",
+    "Who won the most recent FIFA World Cup?",
+])
+def test_ordinary_world_questions_still_use_web_search(question):
+    web = FakeWeb(HITS)
+    run(0.0, web, question)
+    assert web.queries == [question]
+
+
+@pytest.mark.parametrize("question", [
+    "What is the latest news about OpenAI?", "What is the weather in Paris today?", "Who won the most recent FIFA World Cup?",
+    "What is the current price of Bitcoin?", "Who is the current president of France?", "What happened in 2026?",
+    "Score of the Lakers game?",
+])
+def test_real_time_questions_are_detected(question):
+    assert needs_fresh_results(question)
+
+
+@pytest.mark.parametrize("question", [
+    "What is the capital of Australia?", "Who painted the Mona Lisa?", "What is a monopoly?",
+    "What does the author say about recent trends?", "Summarise the latest chapter of this book",
+])
+def test_evergreen_and_pdf_questions_are_not_time_sensitive(question):
+    assert not needs_fresh_results(question)
+
+
+def test_real_time_question_goes_to_the_web_even_when_the_pdf_covers_the_topic():
+    web = FakeWeb(HITS)
+    path, state, llm = run(0.9, web, "What is the latest news about monopolies?")   # strong PDF match
+    assert path == ["retrieve", "check_scope", "web_search", "generate_general"]
+    assert web.fresh is True and system_is_web(llm)
+
+
+def test_real_time_question_stays_with_the_pdf_when_web_search_is_off():
+    path, _, _ = run(0.9, None, "What is the latest news about monopolies?")
+    assert path == ["retrieve", "check_scope", "generate_from_pdf"]
+
+
+def system_is_web(llm):
+    return llm.calls[-1][0].startswith(WEB_PROMPT)
+
+
+def test_ordinary_questions_use_a_normal_not_a_news_search():
+    web = FakeWeb(HITS)
+    run(0.0, web, "What is the capital of Australia?")
+    assert web.fresh is False
+
+
+def test_fresh_search_asks_tavily_for_recent_news_and_keeps_the_date(monkeypatch):
+    monkeypatch.setattr(settings, "tavily_api_key", "tvly-test")
+    bodies = []
+
+    def handler(request):
+        body = json.loads(request.read())
+        bodies.append(body)
+        return httpx.Response(200, json={"results": [
+            {"title": "T", "url": "https://n.example/1", "content": "News text.", "published_date": "Sun, 25 Oct 2026"}]})
+
+    results = TavilySearch(tavily_client(handler)).search("latest news", fresh=True)
+    assert bodies[0]["topic"] == "news" and bodies[0]["days"] == settings.web_fresh_days
+    assert results[0].published == "Sun, 25 Oct 2026"
+
+
+def test_fresh_search_with_no_news_retries_as_a_normal_search(monkeypatch):
+    monkeypatch.setattr(settings, "tavily_api_key", "tvly-test")
+    bodies = []
+
+    def handler(request):
+        body = json.loads(request.read())
+        bodies.append(body)
+        hits = [] if body.get("topic") == "news" else [{"title": "T", "url": "https://n.example/1", "content": "Evergreen."}]
+        return httpx.Response(200, json={"results": hits})
+
+    results = TavilySearch(tavily_client(handler)).search("latest thing", fresh=True)
+    assert [b.get("topic") for b in bodies] == ["news", None] and results[0].content == "Evergreen."
+
+
+def test_web_prompt_carries_todays_date_and_publication_dates():
+    prompt = web_user_prompt("q?", [WebResult("A", "https://a", "x", published="Sun, 25 Oct 2026")], today=date(2026, 11, 2))
+    assert prompt.startswith("Today's date: 2026-11-02") and "published Sun, 25 Oct 2026" in prompt
+
+
+def test_thin_news_results_are_topped_up_with_normal_results_without_duplicates(monkeypatch):
+    monkeypatch.setattr(settings, "tavily_api_key", "tvly-test")
+
+    def handler(request):
+        if json.loads(request.read()).get("topic") == "news":
+            hits = [{"title": "N", "url": "https://n.example/1", "content": "fresh", "published_date": "Mon, 02 Nov 2026"}]
+        else:
+            hits = [{"title": "N", "url": "https://n.example/1", "content": "dup"},
+                    {"title": "E", "url": "https://e.example/2", "content": "evergreen"}]
+        return httpx.Response(200, json={"results": hits})
+
+    results = TavilySearch(tavily_client(handler)).search("weather", fresh=True)
+    assert [r.url for r in results] == ["https://n.example/1", "https://e.example/2"] and results[0].content == "fresh"

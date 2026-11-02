@@ -150,7 +150,10 @@ and a Groq failure surfaces as a clear error. The answer reports which provider 
 When the gate decides the PDF does not cover a question, the app can search the web with [Tavily](https://tavily.com) and answer from the results,
 citing them as [1], [2] with clickable links (the UI shows a blue "answered from web search" banner). Set `TAVILY_API_KEY` in `.env` to enable it.
 
-- Only the question text is sent to Tavily, and only for out-of-PDF questions. PDF content never leaves the machine.
+- **Real-time questions always use the web**, even when the PDF touches the topic: news, prices, scores, weather, "latest/current/today", years 2025+.
+  These search recent news (last 30 days, topped up with a normal search if few hits), the prompt gets today's date and each result's publication date,
+  and the model must say how recent the information is. Questions about the PDF itself ("the book", "page 5") are never sent to the web.
+- Only the question text is sent to Tavily, and only for out-of-PDF or real-time questions. PDF content never leaves the machine.
 - Search results are treated as untrusted data: the prompt tells the model never to follow instructions found in them.
 - If Tavily is down, rate-limited or finds nothing, the app falls back to the model's own knowledge (yellow banner) and says why.
 - Without a key nothing changes: out-of-PDF answers come from model knowledge, flagged "NOT FROM THE PDF".

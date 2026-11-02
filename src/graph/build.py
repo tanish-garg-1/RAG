@@ -1,3 +1,5 @@
+from functools import partial
+
 from langgraph.graph import END, START, StateGraph
 
 from src.graph.nodes import RAGNodes, route_after_scope
@@ -28,7 +30,7 @@ def build_rag_graph(nodes: RAGNodes):
     graph.add_edge("retrieve", "check_scope")
     graph.add_conditional_edges(
         "check_scope",
-        route_after_scope,
+        partial(route_after_scope, web_enabled=web),
         {
             "generate_from_pdf": "generate_from_pdf",
             "rewrite_query": "rewrite_query",

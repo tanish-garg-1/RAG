@@ -37,6 +37,7 @@ class WebResult:
     title: str
     url: str
     content: str
+    published: str | None = None   # publication date when the search engine knows it (news results)
 
 
 @dataclass
@@ -65,9 +66,9 @@ class RAGResult:
     @property
     def answer_source(self) -> str:
         """Where the answer's facts came from: the "pdf", the "web", or the "model"'s own knowledge."""
-        if self.verdict.in_pdf:
-            return "pdf"
-        return "web" if self.web_sources else "model"
+        if self.web_sources:
+            return "web"   # real-time questions are answered from the web even when the PDF overlaps with the topic
+        return "pdf" if self.verdict.in_pdf else "model"
 
     @property
     def pages(self) -> list[int]:

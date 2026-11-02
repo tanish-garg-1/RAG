@@ -6,6 +6,7 @@ from src.generation.prompts import (
     in_pdf_user_prompt, rewrite_user_prompt, web_user_prompt, with_persona,
 )
 from src.graph.state import RAGState, add_timing
+from src.search.web_search import needs_fresh_results, refers_to_document
 
 
 class RAGNodes:
@@ -52,8 +53,11 @@ class RAGNodes:
 
     def web_search(self, state: RAGState) -> dict:
         start = time.perf_counter()
+        if refers_to_document(state["question"]):
+            return {"web_sources": [], "web_error": "Web search skipped: the question is about the PDF itself, which the web cannot know."}
         try:
-            results = self.web_search_client.search(state["question"])   # the original question, not a PDF-oriented rewrite
+            question = state["question"]   # the original question, not a PDF-oriented rewrite
+            results = self.web_search_client.search(question, fresh=needs_fresh_results(question))
         except Exception as exc:   # deliberately broad: any search failure must degrade to the model's own knowledge
             return {"web_sources": [], "web_error": f"{type(exc).__name__}: {str(exc)[:150]}",
                     "timings_ms": add_timing(state, "web_ms", (time.perf_counter() - start) * 1000)}
@@ -72,9 +76,11 @@ class RAGNodes:
         return {"answer": answer, "timings_ms": add_timing(state, "llm_ms", (time.perf_counter() - start) * 1000)}
 
 
-def route_after_scope(state: RAGState) -> str:
-    """The conditional edge: answer from the PDF, retry the search, or answer generally."""
+def route_after_scope(state: RAGState, web_enabled: bool = False) -> str:
+    """The conditional edge: answer from the PDF, retry the search, or answer generally (via the web when enabled)."""
     verdict = state["verdict"]
+    if web_enabled and needs_fresh_results(state["question"]):
+        return "generate_general"   # real-time / news questions: a PDF can't know, even if the topic overlaps with it
     if verdict.in_pdf:
         return "generate_from_pdf"
     retries_left = len(state.get("rewritten_queries", [])) < settings.max_rewrites

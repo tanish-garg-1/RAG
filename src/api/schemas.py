@@ -25,6 +25,7 @@ class WebSource(BaseModel):
     title: str
     url: str
     content: str
+    published: str | None = None
 
 
 class Contribution(BaseModel):

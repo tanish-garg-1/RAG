@@ -31,6 +31,7 @@ class Settings:
         self.tavily_base_url = os.getenv("TAVILY_BASE_URL", "https://api.tavily.com")   # overridable so tests can use a local fake
         self.web_max_results = 4
         self.web_timeout_s = 15
+        self.web_fresh_days = 30   # how far back news is searched for time-sensitive questions
 
         # --- Local models (FastEmbed / ONNX) ---
         self.embed_model = "BAAI/bge-small-en-v1.5"

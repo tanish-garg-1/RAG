@@ -128,7 +128,7 @@ def create_app(pipeline=None, query_logger: QueryLogger | None = None, warm_up: 
             provider=result.provider,
             persona=result.persona,
             answer_source=result.answer_source,
-            web_sources=[WebSource(title=w.title, url=w.url, content=w.content) for w in result.web_sources],
+            web_sources=[WebSource(title=w.title, url=w.url, content=w.content, published=w.published) for w in result.web_sources],
             web_search_error=result.web_error,
             path=result.path,
             rewritten_queries=result.rewritten_queries,
